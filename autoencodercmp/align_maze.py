@@ -34,3 +34,26 @@ def align_maze(idx_trials, activity_list, frame_trial, maze_position, reshape=Fa
                                         max_posF, bin_spacing)]).T
 
     return activity_binned
+
+def align_ITI(idx_trials, activity_list,frame_trial,choFrameOffsets,reshape=False):
+    'Align activity data by binning based on time in ITI period.'
+    n_bin=15
+
+    # end in maze
+    end_maze = np.zeros(len(idx_trials), 'int16')
+    for (i, idx_trial) in enumerate(idx_trials):
+        offset = choFrameOffsets[frame_trial == idx_trial]
+        end_maze[i] = int(np.argmin(np.abs(offset)))
+
+    # n_trails by n_neuron by n_bin
+    shape = activity_list[0].shape[-1]  # n_neuron (n_feature)
+    activity_ITI = np.zeros((len(idx_trials), shape, n_bin))  # shape: n_neuron by n_seq, for the convinence of plot
+
+    for (i, idx_trial) in enumerate(idx_trials):
+        activity_i = activity_list[i]
+        if reshape == True:
+            activity_i = activity_i.reshape(activity_i.shape[1], activity_i.shape[2])
+        for j in range(n_bin):
+            activity_ITI[i, :, j] = np.average(activity_i[end_maze[i] + 2 * j + 1:end_maze[i] + 2 * j + 3, :], axis=0)
+
+    return activity_ITI

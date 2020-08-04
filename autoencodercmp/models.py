@@ -11,6 +11,8 @@ from keras.layers import Dropout, Lambda, RepeatVector,Masking,Input,Bidirection
 from keras.optimizers import SGD, RMSprop, Adam
 from keras import objectives
 
+from align_maze import align_maze
+
 #============================================
 # models
 #============================================
@@ -19,14 +21,16 @@ from keras import objectives
 # 2. variational autoencoder with binned input
 # 3. variational autoencoder with not-binned input, data fed with data_generator
 
-def create_lstm_ae(input_dim, timesteps, latent_dim, latent_fac):
-    'autoencoder with binned input'
+
+def create_lstm_ae(input_dim, timesteps, intermediate_dim, latent_dim, latent_fac):
     inputs = Input(shape=(timesteps, input_dim))
-    bi_latent_dim = int(latent_dim / 2)
-    encoded = Bidirectional(LSTM(bi_latent_dim, dropout=0.1, recurrent_dropout=0.1))(inputs)
+    bi_intermediate_dim = int(intermediate_dim / 2)
+    h = Bidirectional(LSTM(bi_intermediate_dim, dropout=0.1, recurrent_dropout=0.1))(inputs)
+
+    encoded = Dense(latent_dim)(h)
 
     decoded1 = RepeatVector(timesteps)(encoded)
-    decoded2 = LSTM(latent_dim, return_sequences=True)(decoded1)
+    decoded2 = LSTM(intermediate_dim, return_sequences=True, dropout=0.1, recurrent_dropout=0.1)(decoded1)
     decoded3 = Dense(latent_fac, activation='relu')(decoded2)
     decoded4 = Dense(input_dim, activation='relu')(decoded3)
 
@@ -34,13 +38,12 @@ def create_lstm_ae(input_dim, timesteps, latent_dim, latent_fac):
     ae_encoder = Model(inputs, encoded)
     ae_encoder2 = Model(inputs, decoded3)
 
-    ae.compile(optimizer='adam', loss='mse')
+    ae.compile(optimizer='adam', loss='mse', metrics=['mse'])
     return ae, ae_encoder, ae_encoder2
 
 
 def create_binned_lstm_vae(input_dim,
                            timesteps,
-                           batch_size,
                            intermediate_dim,
                            latent_dim,
                            latent_fac,
@@ -50,7 +53,6 @@ def create_binned_lstm_vae(input_dim,
     # Arguments
         input_dim: int.
         timesteps: int, input timestep dimension.
-        batch_size: int.
         intermediate_dim: int, output shape of LSTM.
         latent_dim: int, latent z-layer shape.
         epsilon_std: float, z-layer sigma.
@@ -116,7 +118,6 @@ def create_binned_lstm_vae(input_dim,
 
 def create_lstm_vae(input_dim,
                     timesteps,
-                    batch_size,
                     intermediate_dim,
                     latent_dim,
                     latent_fac,
@@ -126,7 +127,6 @@ def create_lstm_vae(input_dim,
     # Arguments
         input_dim: int.
         timesteps: int, input timestep dimension.
-        batch_size: int.
         intermediate_dim: int, output shape of LSTM.
         latent_dim: int, latent z-layer shape.
         epsilon_std: float, z-layer sigma.

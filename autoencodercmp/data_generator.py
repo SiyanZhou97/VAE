@@ -1,19 +1,25 @@
 import numpy as np
 import keras
 
+
 #============================================
 # helper functions: data generation function
 #============================================
 
 
 class DataGenerator(keras.utils.Sequence):
-    'Generates data for Keras. Since the input is of different length, currently only support batch_size=1'
+    """
+    Generates data for Keras. Since the input is of different length,
+    if batch_size>1, trials in a batch will be aligned to the shortest one by truncating
+    """
 
     def __init__(self, data, label, batch_size=1, shuffle=True):
         'Initialization'
         self.batch_size = batch_size
         self.data = data
+        self.data_dim=self.data[0].shape[-1]
         self.label = label
+        self.label_dim=self.label[0].shape[-1]
         self.shuffle = shuffle
         self.on_epoch_end()
 
@@ -23,7 +29,7 @@ class DataGenerator(keras.utils.Sequence):
 
     def __getitem__(self, index):
         'Generate one batch of data'
-        # Generate indexes of the batch
+        # Generate indexes of the batch (in a list)
         sample_indexes = self.indexes[index * self.batch_size:(index + 1) * self.batch_size]
 
         # Generate data
@@ -38,13 +44,25 @@ class DataGenerator(keras.utils.Sequence):
             np.random.shuffle(self.indexes)
 
     def __data_generation(self, sample_indexes):
-        'Generates data containing batch_size samples'  # X : (n_samples, *dim, n_channels)
+        'Generates data containing batch_size samples'  # X : (n_samples, n_seq, n_channels)
         # Initialization
-        sample_indexes = int(sample_indexes)
+        beforetrunc_data={}
+        beforetrunc_label={}
+        shortest_length=1000
+        for idx in sample_indexes:
+            idx=int(idx)
+            beforetrunc_data_idx=self.data[idx]
+            beforetrunc_label_idx = self.label[idx]
+            beforetrunc_data[idx]=beforetrunc_data_idx.reshape(1,beforetrunc_data_idx.shape[0],self.data_dim)
+            beforetrunc_label[idx] = beforetrunc_label_idx.reshape(1, beforetrunc_label_idx.shape[0],self.label_dim)
+            shortest_length=min(shortest_length,beforetrunc_data_idx.shape[0])
 
-        X = self.data[sample_indexes]
-        y = self.label[sample_indexes]
-        X = X.reshape(1, X.shape[0], X.shape[1])
-        y = y.reshape(1, y.shape[0], y.shape[1])
+        X=np.zeros((self.batch_size,shortest_length,self.data_dim))
+        y= np.zeros((self.batch_size, shortest_length, self.label_dim))
+
+        for i in range(self.batch_size):
+            X[i, :, :] = beforetrunc_data[int(sample_indexes[i])][0,:shortest_length,:]
+            y[i, :, :] = beforetrunc_label[int(sample_indexes[i])][0, :shortest_length, :]
 
         return X, y
+
